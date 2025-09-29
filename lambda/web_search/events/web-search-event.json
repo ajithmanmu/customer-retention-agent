@@ -1,0 +1,21 @@
+{
+  "httpMethod": "POST",
+  "path": "/web-search",
+  "headers": {
+    "Content-Type": "application/json",
+    "User-Agent": "sam-local"
+  },
+  "body": "{\"query\": \"customer retention strategies 2024\", \"region\": \"us-en\", \"max_results\": 3}",
+  "isBase64Encoded": false,
+  "requestContext": {
+    "requestId": "test-request-id-12345",
+    "functionName": "dev-customer-retention-web-search",
+    "functionVersion": "$LATEST",
+    "invokedFunctionArn": "arn:aws:lambda:us-east-1:123456789012:function:dev-customer-retention-web-search",
+    "memoryLimitInMB": "256",
+    "awsRequestId": "test-request-id-12345"
+  },
+  "pathParameters": null,
+  "queryStringParameters": null,
+  "stageVariables": null
+}

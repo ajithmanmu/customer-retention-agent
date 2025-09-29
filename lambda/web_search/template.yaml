@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Customer Retention Agent - Web Search Lambda Function'
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: python3.9
+    Environment:
+      Variables:
+        LOG_LEVEL: INFO
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Environment name
+
+Resources:
+  # Web Search Lambda Function
+  WebSearchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-customer-retention-web-search'
+      CodeUri: ./
+      Handler: main.lambda_handler
+      Runtime: python3.9
+      Description: 'Web search Lambda function for Customer Retention Agent'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+      Events:
+        # API Gateway event for testing
+        WebSearchApi:
+          Type: Api
+          Properties:
+            Path: /web-search
+            Method: post
+            RestApiId: !Ref WebSearchApi
+      Tags:
+        Project: customer-retention-agent
+        Environment: !Ref Environment
+        Function: web_search
+
+  # API Gateway for testing
+  WebSearchApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+      Tags:
+        Project: customer-retention-agent
+        Environment: !Ref Environment
+
+  # CloudWatch Log Group
+  WebSearchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${WebSearchFunction}'
+      RetentionInDays: 14
+
+Outputs:
+  WebSearchFunction:
+    Description: "Web Search Lambda Function ARN"
+    Value: !GetAtt WebSearchFunction.Arn
+    Export:
+      Name: !Sub '${Environment}-web-search-function-arn'
+
+  WebSearchApi:
+    Description: "API Gateway endpoint URL for Web Search function"
+    Value: !Sub 'https://${WebSearchApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/web-search'
+    Export:
+      Name: !Sub '${Environment}-web-search-api-url'
+
+  WebSearchFunctionName:
+    Description: "Web Search Lambda Function Name"
+    Value: !Ref WebSearchFunction
+    Export:
+      Name: !Sub '${Environment}-web-search-function-name'
