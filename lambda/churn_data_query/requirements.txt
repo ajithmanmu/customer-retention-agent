@@ -1,0 +1,3 @@
+# Churn Data Query Lambda Dependencies
+# Core dependencies
+boto3>=1.34.0

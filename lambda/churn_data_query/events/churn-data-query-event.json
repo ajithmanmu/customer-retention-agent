@@ -1,0 +1,21 @@
+{
+  "httpMethod": "POST",
+  "path": "/churn-data-query",
+  "headers": {
+    "Content-Type": "application/json",
+    "User-Agent": "sam-local"
+  },
+  "body": "{\"customer_id\": \"3916-NRPAP\"}",
+  "isBase64Encoded": false,
+  "requestContext": {
+    "requestId": "test-request-id-12345",
+    "functionName": "dev-customer-retention-churn-data-query",
+    "functionVersion": "$LATEST",
+    "invokedFunctionArn": "arn:aws:lambda:us-east-1:123456789012:function:dev-customer-retention-churn-data-query",
+    "memoryLimitInMB": "512",
+    "awsRequestId": "test-request-id-12345"
+  },
+  "pathParameters": null,
+  "queryStringParameters": null,
+  "stageVariables": null
+}

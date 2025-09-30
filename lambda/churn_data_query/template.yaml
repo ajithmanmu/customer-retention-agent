@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Customer Retention Agent - Churn Data Query Lambda Function'
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 512
+    Runtime: python3.9
+    Environment:
+      Variables:
+        LOG_LEVEL: INFO
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Environment name
+
+Resources:
+  # Churn Data Query Lambda Function
+  ChurnDataQueryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-customer-retention-churn-data-query'
+      CodeUri: ./
+      Handler: main.lambda_handler
+      Runtime: python3.9
+      Description: 'Churn data query Lambda function for Customer Retention Agent'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          ATHENA_DATABASE: telco_processed_db
+          ATHENA_OUTPUT_LOCATION: s3://aws-athena-query-results-us-east-1-412602263780/
+      Events:
+        # API Gateway event for testing
+        ChurnDataQueryApi:
+          Type: Api
+          Properties:
+            Path: /churn-data-query
+            Method: post
+            RestApiId: !Ref ChurnDataQueryApi
+      Tags:
+        project: customer-retention-agent
+        Environment: !Ref Environment
+        Function: churn_data_query
+
+  # API Gateway for testing
+  ChurnDataQueryApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+      Tags:
+        Project: customer-retention-agent
+        Environment: !Ref Environment
+
+  # CloudWatch Log Group
+  ChurnDataQueryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ChurnDataQueryFunction}'
+      RetentionInDays: 14
+
+
+Outputs:
+  ChurnDataQueryFunction:
+    Description: "Churn Data Query Lambda Function ARN"
+    Value: !GetAtt ChurnDataQueryFunction.Arn
+    Export:
+      Name: !Sub '${Environment}-churn-data-query-function-arn'
+
+  ChurnDataQueryApi:
+    Description: "API Gateway endpoint URL for Churn Data Query function"
+    Value: !Sub 'https://${ChurnDataQueryApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/churn-data-query'
+    Export:
+      Name: !Sub '${Environment}-churn-data-query-api-url'
+
+  ChurnDataQueryFunctionName:
+    Description: "Churn Data Query Lambda Function Name"
+    Value: !Ref ChurnDataQueryFunction
+    Export:
+      Name: !Sub '${Environment}-churn-data-query-function-name'
