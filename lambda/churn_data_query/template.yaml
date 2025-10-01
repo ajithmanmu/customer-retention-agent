@@ -31,6 +31,7 @@ Resources:
       Handler: main.lambda_handler
       Runtime: python3.9
       Description: 'Churn data query Lambda function for Customer Retention Agent'
+      Role: arn:aws:iam::412602263780:role/CustomerRetentionLambdaExecutionRole
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
