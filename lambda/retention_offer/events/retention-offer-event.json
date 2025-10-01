@@ -1,0 +1,21 @@
+{
+  "httpMethod": "POST",
+  "path": "/retention-offer",
+  "headers": {
+    "Content-Type": "application/json",
+    "User-Agent": "sam-local"
+  },
+  "body": "{\"customer_id\": \"3916-NRPAP\", \"churn_data\": {\"churn_analysis\": {\"churn_risk_score\": 0.75, \"risk_level\": \"HIGH\", \"cancel_intent\": true}, \"customer_profile\": {\"tenure_months\": 2, \"contract_type\": \"Month-to-month\", \"monthly_charges\": 85.0, \"total_charges\": 170.0, \"payment_method\": \"Electronic check\", \"paperless_billing\": \"Yes\", \"services\": {\"phone_service\": \"Yes\", \"internet_service\": \"DSL\", \"online_security\": \"No\", \"tech_support\": \"No\", \"streaming_tv\": \"No\", \"streaming_movies\": \"No\"}}, \"retention_insights\": {\"key_risk_factors\": [\"Month-to-month contract\", \"Low tenure (≤3 months)\"], \"recommendations\": [\"Offer annual contract discount\", \"Provide onboarding support and welcome offers\"]}}}",
+  "isBase64Encoded": false,
+  "requestContext": {
+    "requestId": "test-request-id-12345",
+    "functionName": "dev-customer-retention-retention-offer",
+    "functionVersion": "$LATEST",
+    "invokedFunctionArn": "arn:aws:lambda:us-east-1:123456789012:function:dev-customer-retention-retention-offer",
+    "memoryLimitInMB": "256",
+    "awsRequestId": "test-request-id-12345"
+  },
+  "pathParameters": null,
+  "queryStringParameters": null,
+  "stageVariables": null
+}

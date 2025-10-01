@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Customer Retention Agent - Retention Offer Lambda Function'
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: python3.9
+    Environment:
+      Variables:
+        LOG_LEVEL: INFO
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Environment name
+
+Resources:
+  # Retention Offer Lambda Function
+  RetentionOfferFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Environment}-customer-retention-retention-offer'
+      CodeUri: ./
+      Handler: main.lambda_handler
+      Runtime: python3.9
+      Description: 'Retention offer Lambda function for Customer Retention Agent'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+      Events:
+        # API Gateway event for testing
+        RetentionOfferApi:
+          Type: Api
+          Properties:
+            Path: /retention-offer
+            Method: post
+            RestApiId: !Ref RetentionOfferApi
+      Tags:
+        Project: customer-retention-agent
+        Environment: !Ref Environment
+        Function: retention_offer
+
+  # API Gateway for testing
+  RetentionOfferApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+      Tags:
+        Project: customer-retention-agent
+        Environment: !Ref Environment
+
+  # CloudWatch Log Group
+  RetentionOfferLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${RetentionOfferFunction}'
+      RetentionInDays: 14
+
+Outputs:
+  RetentionOfferFunction:
+    Description: "Retention Offer Lambda Function ARN"
+    Value: !GetAtt RetentionOfferFunction.Arn
+    Export:
+      Name: !Sub '${Environment}-retention-offer-function-arn'
+
+  RetentionOfferApi:
+    Description: "API Gateway endpoint URL for Retention Offer function"
+    Value: !Sub 'https://${RetentionOfferApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/retention-offer'
+    Export:
+      Name: !Sub '${Environment}-retention-offer-api-url'
+
+  RetentionOfferFunctionName:
+    Description: "Retention Offer Lambda Function Name"
+    Value: !Ref RetentionOfferFunction
+    Export:
+      Name: !Sub '${Environment}-retention-offer-function-name'
