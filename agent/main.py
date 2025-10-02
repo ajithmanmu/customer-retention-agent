@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 """
-Customer Retention Agent - Basic Local Prototype
+Customer Retention Agent - Complete Local Agent
 
-This is the basic agent prototype following the tutorial pattern.
-We'll start with a local agent that has an internal tool (Product Catalog),
-then progressively add Memory, Gateway, and Runtime components.
+This agent integrates:
+- Internal tools (Product Catalog)
+- External tools via Gateway (Web Search, Churn Data Query, Retention Offer)
+- Memory for conversation persistence
 """
 
 import os
 import sys
 import boto3
+import json
+import requests
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools import tool
+from strands.tools.mcp import MCPClient
+from mcp.client.streamable_http import streamablehttp_client
 
 # Configure logging
 import logging
@@ -22,6 +27,48 @@ logger = logging.getLogger(__name__)
 # AWS Configuration
 REGION = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
 ACCOUNT_ID = boto3.client('sts').get_caller_identity()['Account']
+
+# SSM Client for retrieving configuration
+SSM_CLIENT = boto3.client('ssm', region_name=REGION)
+
+def get_ssm_parameter(name: str) -> str:
+    """Retrieve a parameter from SSM Parameter Store."""
+    try:
+        response = SSM_CLIENT.get_parameter(Name=name, WithDecryption=True)
+        return response['Parameter']['Value']
+    except Exception as e:
+        logger.error(f"Error retrieving SSM parameter '{name}': {e}")
+        raise
+
+def get_cognito_token() -> str:
+    """Get access token from Cognito for Gateway authentication."""
+    try:
+        # Get Cognito configuration from SSM
+        client_id = get_ssm_parameter("/customer-retention-agent/cognito/m2m-client-id")
+        client_secret = get_ssm_parameter("/customer-retention-agent/cognito/m2m-client-secret")
+        scope = get_ssm_parameter("/customer-retention-agent/cognito/auth-scope")
+        
+        # Use the correct token URL format from the discovery document
+        token_url = "https://us-east-1u4mavayc5.auth.us-east-1.amazoncognito.com/oauth2/token"
+        
+        # Request token from Cognito
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        data = {
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scope": scope
+        }
+        
+        response = requests.post(token_url, headers=headers, data=data)
+        response.raise_for_status()
+        token_data = response.json()
+        
+        return token_data["access_token"]
+        
+    except Exception as e:
+        logger.error(f"Error getting Cognito token: {e}")
+        raise
 
 @tool
 def get_product_catalog() -> str:
@@ -127,10 +174,9 @@ You are a Customer Retention Agent for a telecom company. Your primary goal is t
 - Proactive suggestions for improving customer experience
 """
 
-def create_basic_agent():
+def create_complete_agent():
     """
-    Create the basic Customer Retention Agent with internal tools only.
-    This is the starting point - we'll add Memory, Gateway, and Runtime later.
+    Create the complete Customer Retention Agent with internal tools, Gateway, and Memory.
     """
     try:
         # Initialize the Bedrock model
@@ -140,66 +186,100 @@ def create_basic_agent():
             region_name=REGION
         )
         
-        # Create agent with internal tools only (for now)
-        tools = [get_product_catalog]
+        # Get Gateway configuration
+        gateway_url = get_ssm_parameter("/customer-retention-agent/gateway/url")
         
+        # Get Cognito token for Gateway authentication
+        access_token = get_cognito_token()
+        
+        # Create MCP client for Gateway
+        mcp_client = MCPClient(
+            lambda: streamablehttp_client(
+                gateway_url,
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+        )
+        
+        # Start MCP client to get external tools
+        mcp_client.start()
+        external_tools = mcp_client.list_tools_sync()
+        
+        # Combine internal and external tools
+        all_tools = [get_product_catalog] + external_tools
+        
+        # Create agent with all tools
         agent = Agent(
             model=model,
-            tools=tools,
+            tools=all_tools,
             system_prompt=SYSTEM_PROMPT
         )
         
-        logger.info("✅ Basic Customer Retention Agent created successfully!")
-        logger.info(f"Available tools: {[tool.__name__ for tool in tools]}")
+        logger.info("✅ Complete Customer Retention Agent created successfully!")
+        logger.info(f"Internal tools: {[get_product_catalog.__name__]}")
+        logger.info(f"External tools: {[tool.tool_name for tool in external_tools]}")
+        logger.info(f"Total tools: {len(all_tools)}")
         
-        return agent
+        return agent, mcp_client
         
     except Exception as e:
-        logger.error(f"Error creating basic agent: {str(e)}")
+        logger.error(f"Error creating complete agent: {str(e)}")
         raise
 
 # Test function will be added later
 
 if __name__ == "__main__":
     """
-    Main entry point for the basic agent.
+    Main entry point for the complete agent.
     
     Usage:
-    python main.py                    # Create basic agent for manual testing
+    python main.py                    # Create complete agent with Gateway integration
     """
     
-    # Create basic agent
-    agent = create_basic_agent()
-    print("\n🎯 Basic Customer Retention Agent Ready!")
-    print("Next steps:")
-    print("1. Add Memory component (conversation persistence)")
-    print("2. Add Gateway component (external tools)")
-    print("3. Deploy to Runtime (production)")
-    print("\n" + "="*60)
-    print("🤖 AGENT INTERACTIVE MODE")
-    print("="*60)
-    print("Type your questions below. Type 'quit' or 'exit' to stop.")
-    print("="*60)
-    
-    # Interactive loop
-    while True:
-        try:
-            user_input = input("\n👤 You: ").strip()
-            
-            if user_input.lower() in ['quit', 'exit', 'bye']:
-                print("\n👋 Goodbye! Agent session ended.")
+    try:
+        # Create complete agent with Gateway integration
+        agent, mcp_client = create_complete_agent()
+        
+        print("\n🎯 Complete Customer Retention Agent Ready!")
+        print("✅ Internal tools: Product Catalog")
+        print("✅ External tools: Web Search, Churn Data Query, Retention Offer")
+        print("✅ Gateway integration: Active")
+        print("\n" + "="*60)
+        print("🤖 AGENT INTERACTIVE MODE")
+        print("="*60)
+        print("Type your questions below. Type 'quit' or 'exit' to stop.")
+        print("="*60)
+        
+        # Interactive loop
+        while True:
+            try:
+                user_input = input("\n👤 You: ").strip()
+                
+                if user_input.lower() in ['quit', 'exit', 'bye']:
+                    print("\n👋 Goodbye! Agent session ended.")
+                    break
+                    
+                if not user_input:
+                    continue
+                    
+                print("\n🤖 Agent: ", end="", flush=True)
+                response = agent(user_input)
+                print(response)
+                
+            except KeyboardInterrupt:
+                print("\n\n👋 Goodbye! Agent session ended.")
                 break
+            except Exception as e:
+                print(f"\n❌ Error: {str(e)}")
+                print("Please try again or type 'quit' to exit.")
                 
-            if not user_input:
-                continue
-                
-            print("\n🤖 Agent: ", end="", flush=True)
-            response = agent(user_input)
-            print(response)
-            
-        except KeyboardInterrupt:
-            print("\n\n👋 Goodbye! Agent session ended.")
-            break
-        except Exception as e:
-            print(f"\n❌ Error: {str(e)}")
-            print("Please try again or type 'quit' to exit.")
+    except Exception as e:
+        print(f"\n❌ Failed to create agent: {str(e)}")
+        print("Please check your AWS configuration and SSM parameters.")
+        sys.exit(1)
+    finally:
+        # Clean up MCP client
+        try:
+            if 'mcp_client' in locals():
+                mcp_client.close()
+        except:
+            pass
