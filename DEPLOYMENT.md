@@ -202,13 +202,57 @@ python main.py
 - Connects to Gateway and loads external tools (Web Search, Churn Data Query, Retention Offer)
 - Provides interactive chat interface for testing
 - Combines internal tools (Product Catalog) with external tools via Gateway
+- **Note**: This step is now combined with Step 9 (Memory Integration)
 
 **Test Commands to Try**:
 - "What tools do you have available?"
 - "Show me your product catalog"
 - "Search for customer retention strategies 2024"
-- "Check churn data for customer 7590-VHVEF"
+- "Check churn data for customer 3916-NRPAP"
 - "Generate a retention offer for a high-risk customer"
+
+### Step 8: Create and Attach Memory (Python Script)
+
+**Script Location**: `agent/scripts/create_memory.py`
+
+**Command**:
+```bash
+cd agent/scripts
+python create_memory.py
+```
+
+**What this script does**:
+- Creates AgentCore Memory for conversation persistence
+- Tests memory functionality with sample operations
+- Stores memory ID and ARN in SSM Parameter Store
+- Parameters: `/customer-retention-agent/memory/id` and `/customer-retention-agent/memory/arn`
+
+### Step 9: Test Agent with Memory (Local)
+
+**Script Location**: `agent/main.py` (now includes memory integration)
+
+**Command**:
+```bash
+cd agent
+python main.py
+```
+
+**What this does**:
+- Creates the complete Customer Retention Agent with memory integration
+- Persists conversation history across sessions
+- Provides customer context awareness
+- Remembers customer preferences and past interactions
+- Combines internal tools (Product Catalog) with external tools via Gateway
+- Automatically retrieves customer context and saves conversations
+
+**Memory Test Commands**:
+- "What tools do you have available?"
+- "I prefer premium plans with international calling"
+- "What did I say I preferred earlier?" (tests memory)
+- "Check churn data for customer 3916-NRPAP"
+- "Generate a retention offer based on my preferences" (uses memory context)
+- "I'm a family of 4 and we need unlimited data" (memory learning)
+- "What would you recommend for me?" (memory retrieval)
 
 ## 🧹 Cleanup Instructions
 
@@ -236,7 +280,6 @@ cd lambda/retention_offer && sam delete
    # Delete Bedrock SSM parameters
    aws ssm delete-parameter --name "/app/retention/agentcore/knowledge_base_id"
    aws ssm delete-parameter --name "/app/retention/agentcore/data_source_id"
-   aws ssm delete-parameter --name "/app/retention/agentcore/memory_id"
    
    # Delete Gateway SSM parameters
    aws ssm delete-parameter --name "/customer-retention-agent/gateway/id"
@@ -244,6 +287,10 @@ cd lambda/retention_offer && sam delete
    aws ssm delete-parameter --name "/customer-retention-agent/gateway/targets/websearchtarget"
    aws ssm delete-parameter --name "/customer-retention-agent/gateway/targets/churndataquerytarget"
    aws ssm delete-parameter --name "/customer-retention-agent/gateway/targets/retentionoffertarget"
+   
+   # Delete Memory SSM parameters
+   aws ssm delete-parameter --name "/customer-retention-agent/memory/id"
+   aws ssm delete-parameter --name "/customer-retention-agent/memory/arn"
    ```
 
 ### Step 4: Delete Cognito Resources (Manual)
@@ -288,10 +335,13 @@ aws s3 rb s3://412602263780-us-east-1-retention-kb-bucket
 | AgentCore Gateway | `customer-retention-gateway` | 5 | Python Script (`agent/scripts/create_gateway.py`) | Manual |
 | Gateway IAM Role | `CustomerRetentionGatewayRole` | 5 | Python Script (`agent/scripts/create_gateway.py`) | Manual |
 | Gateway Targets | `WebSearchTarget`, `ChurnDataQueryTarget`, `RetentionOfferTarget` | 6 | Python Script (`agent/scripts/attach_lambda_targets.py`) | Manual |
-| Agent | Complete Customer Retention Agent | 7 | Python Script (`agent/main.py`) | N/A (Local) |
+| Agent | Complete Customer Retention Agent with Memory | 7,9 | Python Script (`agent/main.py`) | N/A (Local) |
+| Memory | `customer-retention-memory` | 8 | Python Script (`agent/scripts/create_memory.py`) | Manual |
+| Memory Hooks | Memory Integration Logic | 9 | Integrated in `agent/memory_hooks.py` | N/A (Local) |
 | SSM Parameters | `/app/retention/agentcore/*` | 1 | Manual | Manual |
 | SSM Parameters | `/customer-retention-agent/cognito/*` | 4 | Manual | Manual |
 | SSM Parameters | `/customer-retention-agent/gateway/*` | 5,6 | Python Scripts | Manual |
+| SSM Parameters | `/customer-retention-agent/memory/*` | 8 | Python Script | Manual |
 
 ## 🔧 Troubleshooting
 

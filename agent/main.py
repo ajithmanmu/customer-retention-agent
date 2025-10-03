@@ -13,11 +13,13 @@ import sys
 import boto3
 import json
 import requests
+import uuid
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools import tool
 from strands.tools.mcp import MCPClient
 from mcp.client.streamable_http import streamablehttp_client
+from memory_hooks import CustomerRetentionMemoryHooks
 
 # Configure logging
 import logging
@@ -30,6 +32,8 @@ ACCOUNT_ID = boto3.client('sts').get_caller_identity()['Account']
 
 # SSM Client for retrieving configuration
 SSM_CLIENT = boto3.client('ssm', region_name=REGION)
+
+# Memory Client for AgentCore Memory (now handled in memory_hooks.py)
 
 def get_ssm_parameter(name: str) -> str:
     """Retrieve a parameter from SSM Parameter Store."""
@@ -144,6 +148,7 @@ def get_product_catalog() -> str:
         logger.error(f"Error getting product catalog: {str(e)}")
         return f"Error retrieving product catalog: {str(e)}"
 
+
 # System prompt for the Customer Retention Agent
 SYSTEM_PROMPT = """
 You are a Customer Retention Agent for a telecom company. Your primary goal is to help retain customers who are at risk of churning.
@@ -207,10 +212,19 @@ def create_complete_agent():
         # Combine internal and external tools
         all_tools = [get_product_catalog] + external_tools
         
-        # Create agent with all tools
+        # Initialize Memory Hooks
+        memory_id = get_ssm_parameter("/customer-retention-agent/memory/id")
+        # For testing, we can use a fixed customer ID or generate one
+        customer_id = "test-customer-001" 
+        session_id = str(uuid.uuid4())
+        memory_hooks = CustomerRetentionMemoryHooks(memory_id, customer_id, session_id, REGION)
+        logger.info(f"✅ Initialized Memory Hooks for customer: {customer_id}, session: {session_id}")
+        
+        # Create agent with all tools and memory hooks
         agent = Agent(
             model=model,
             tools=all_tools,
+            hooks=[memory_hooks],  # Attach memory hooks
             system_prompt=SYSTEM_PROMPT
         )
         
@@ -218,6 +232,7 @@ def create_complete_agent():
         logger.info(f"Internal tools: {[get_product_catalog.__name__]}")
         logger.info(f"External tools: {[tool.tool_name for tool in external_tools]}")
         logger.info(f"Total tools: {len(all_tools)}")
+        logger.info(f"Memory integration: Active (customer: {customer_id})")
         
         return agent, mcp_client
         
@@ -243,10 +258,12 @@ if __name__ == "__main__":
         print("✅ Internal tools: Product Catalog")
         print("✅ External tools: Web Search, Churn Data Query, Retention Offer")
         print("✅ Gateway integration: Active")
+        print("✅ Memory integration: Active (persistent conversations)")
         print("\n" + "="*60)
         print("🤖 AGENT INTERACTIVE MODE")
         print("="*60)
         print("Type your questions below. Type 'quit' or 'exit' to stop.")
+        print("The agent will remember your conversations and preferences!")
         print("="*60)
         
         # Interactive loop
