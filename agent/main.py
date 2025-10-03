@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """
-Customer Retention Agent - Complete Local Agent
+Customer Retention Agent - Runtime Only Version
 
-This agent integrates:
-- Internal tools (Product Catalog)
-- External tools via Gateway (Web Search, Churn Data Query, Retention Offer)
-- Memory for conversation persistence
+This is a clean, production-ready agent for AgentCore Runtime deployment.
+No interactive mode, no complex logic - just the runtime entrypoint.
 """
 
 import os
@@ -20,6 +18,7 @@ from strands.tools import tool
 from strands.tools.mcp import MCPClient
 from mcp.client.streamable_http import streamablehttp_client
 from memory_hooks import CustomerRetentionMemoryHooks
+from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
 # Configure logging
 import logging
@@ -32,8 +31,6 @@ ACCOUNT_ID = boto3.client('sts').get_caller_identity()['Account']
 
 # SSM Client for retrieving configuration
 SSM_CLIENT = boto3.client('ssm', region_name=REGION)
-
-# Memory Client for AgentCore Memory (now handled in memory_hooks.py)
 
 def get_ssm_parameter(name: str) -> str:
     """Retrieve a parameter from SSM Parameter Store."""
@@ -148,7 +145,6 @@ def get_product_catalog() -> str:
         logger.error(f"Error getting product catalog: {str(e)}")
         return f"Error retrieving product catalog: {str(e)}"
 
-
 # System prompt for the Customer Retention Agent
 SYSTEM_PROMPT = """
 You are a Customer Retention Agent for a telecom company. Your primary goal is to help retain customers who are at risk of churning.
@@ -179,15 +175,15 @@ You are a Customer Retention Agent for a telecom company. Your primary goal is t
 - Proactive suggestions for improving customer experience
 """
 
-def create_complete_agent():
+def create_agent():
     """
-    Create the complete Customer Retention Agent with internal tools, Gateway, and Memory.
+    Create the Customer Retention Agent with internal tools, Gateway, and Memory.
     """
     try:
         # Initialize the Bedrock model
         model = BedrockModel(
             model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-            temperature=0.3,  # Balanced between creativity and consistency
+            temperature=0.3,
             region_name=REGION
         )
         
@@ -214,21 +210,19 @@ def create_complete_agent():
         
         # Initialize Memory Hooks
         memory_id = get_ssm_parameter("/customer-retention-agent/memory/id")
-        # For testing, we can use a fixed customer ID or generate one
-        customer_id = "test-customer-001" 
         session_id = str(uuid.uuid4())
+        customer_id = f"session-{session_id[:8]}"
         memory_hooks = CustomerRetentionMemoryHooks(memory_id, customer_id, session_id, REGION)
-        logger.info(f"✅ Initialized Memory Hooks for customer: {customer_id}, session: {session_id}")
         
         # Create agent with all tools and memory hooks
         agent = Agent(
             model=model,
             tools=all_tools,
-            hooks=[memory_hooks],  # Attach memory hooks
+            hooks=[memory_hooks],
             system_prompt=SYSTEM_PROMPT
         )
         
-        logger.info("✅ Complete Customer Retention Agent created successfully!")
+        logger.info("✅ Customer Retention Agent created successfully!")
         logger.info(f"Internal tools: {[get_product_catalog.__name__]}")
         logger.info(f"External tools: {[tool.tool_name for tool in external_tools]}")
         logger.info(f"Total tools: {len(all_tools)}")
@@ -237,66 +231,48 @@ def create_complete_agent():
         return agent, mcp_client
         
     except Exception as e:
-        logger.error(f"Error creating complete agent: {str(e)}")
+        logger.error(f"Error creating agent: {str(e)}")
         raise
 
-# Test function will be added later
+# Initialize the AgentCore Runtime App
+app = BedrockAgentCoreApp()
 
-if __name__ == "__main__":
+@app.entrypoint
+def invoke(payload):
     """
-    Main entry point for the complete agent.
+    AgentCore Runtime entrypoint function
     
-    Usage:
-    python main.py                    # Create complete agent with Gateway integration
+    Args:
+        payload (dict): The request payload containing:
+            - prompt (str): The user's input message
+            
+    Returns:
+        str: The agent's response text
     """
+    user_input = payload.get("prompt", "")
+    
+    if not user_input:
+        return "Error: No prompt provided in the request payload."
     
     try:
-        # Create complete agent with Gateway integration
-        agent, mcp_client = create_complete_agent()
+        # Create the agent for this request
+        agent, mcp_client = create_agent()
         
-        print("\n🎯 Complete Customer Retention Agent Ready!")
-        print("✅ Internal tools: Product Catalog")
-        print("✅ External tools: Web Search, Churn Data Query, Retention Offer")
-        print("✅ Gateway integration: Active")
-        print("✅ Memory integration: Active (persistent conversations)")
-        print("\n" + "="*60)
-        print("🤖 AGENT INTERACTIVE MODE")
-        print("="*60)
-        print("Type your questions below. Type 'quit' or 'exit' to stop.")
-        print("The agent will remember your conversations and preferences!")
-        print("="*60)
+        # Invoke the agent with the user input
+        response = agent(user_input)
         
-        # Interactive loop
-        while True:
-            try:
-                user_input = input("\n👤 You: ").strip()
-                
-                if user_input.lower() in ['quit', 'exit', 'bye']:
-                    print("\n👋 Goodbye! Agent session ended.")
-                    break
-                    
-                if not user_input:
-                    continue
-                    
-                print("\n🤖 Agent: ", end="", flush=True)
-                response = agent(user_input)
-                print(response)
-                
-            except KeyboardInterrupt:
-                print("\n\n👋 Goodbye! Agent session ended.")
-                break
-            except Exception as e:
-                print(f"\n❌ Error: {str(e)}")
-                print("Please try again or type 'quit' to exit.")
-                
-    except Exception as e:
-        print(f"\n❌ Failed to create agent: {str(e)}")
-        print("Please check your AWS configuration and SSM parameters.")
-        sys.exit(1)
-    finally:
-        # Clean up MCP client
+        # Clean up the MCP client
         try:
-            if 'mcp_client' in locals():
-                mcp_client.close()
+            mcp_client.close()
         except:
             pass
+            
+        return response.message["content"][0]["text"]
+    except Exception as e:
+        logger.error(f"Error processing request: {str(e)}")
+        return f"Error processing request: {str(e)}"
+
+# This file is ONLY for runtime deployment - no interactive mode
+if __name__ == "__main__":
+    # Always run in runtime mode
+    app.run()

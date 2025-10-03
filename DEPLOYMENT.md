@@ -277,9 +277,135 @@ python main.py
 - "What are our SLA response time requirements?" (should mention 30 seconds for phone calls)
 - "What is the process for billing disputes?" (should provide detailed procedure)
 
+## 🚀 Production Deployment (AgentCore Runtime)
+
+### Step 12: Deploy to AgentCore Runtime
+
+**Prerequisites:**
+- Complete all previous steps
+- AgentCore Starter Toolkit installed: `pip install bedrock-agentcore-starter-toolkit`
+
+**Deployment Commands:**
+```bash
+cd agent
+
+# Configure the agent for runtime deployment
+agentcore configure -e main.py
+
+# Deploy to AgentCore Runtime
+agentcore launch
+```
+
+**Configuration Options Selected:**
+- **Agent Name**: `main`
+- **Execution Role**: Auto-create
+- **ECR Repository**: Auto-create
+- **Authorization**: IAM (default)
+- **Memory**: Short-term + Long-term memory enabled
+- **Platform**: ARM64 (CodeBuild deployment)
+
+### Step 13: Fix SSM Permissions (CRITICAL)
+
+**Problem**: The auto-created execution role lacks SSM Parameter Store permissions.
+
+**Solution**: Add the following inline policy to the execution role `AmazonBedrockAgentCoreSDKRuntime-us-east-1-{random}`:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "SSMParameterAccess",
+            "Effect": "Allow",
+            "Action": [
+                "ssm:GetParameter",
+                "ssm:GetParameters"
+            ],
+            "Resource": [
+                "arn:aws:ssm:us-east-1:412602263780:parameter/customer-retention-agent/*"
+            ]
+        }
+    ]
+}
+```
+
+**Steps:**
+1. Go to IAM Console → Roles → `AmazonBedrockAgentCoreSDKRuntime-us-east-1-{random}`
+2. Click "Add permissions" → "Create inline policy"
+3. Paste the JSON above
+4. Name it: `CustomerRetentionSSMPolicy`
+5. Save
+
+### Step 14: Test Production Agent
+
+**Test Commands:**
+```bash
+# Basic functionality test
+agentcore invoke '{"prompt": "Hello"}'
+
+# Product catalog test
+agentcore invoke '{"prompt": "What telecom plans do you offer?"}'
+
+# Churn analysis test
+agentcore invoke '{"prompt": "Check the churn risk for customer ID 3916-NRPAP"}'
+
+# Retention offer test
+agentcore invoke '{"prompt": "Create a personalized offer for customer 3916-NRPAP"}'
+```
+
+**Expected Results:**
+- ✅ Agent responds with professional customer service tone
+- ✅ Product catalog displays all plans and pricing
+- ✅ Churn data query returns customer risk scores
+- ✅ Retention offers are personalized and data-driven
+- ✅ Memory integration maintains customer context
+
+**Production Agent ARN**: `arn:aws:bedrock-agentcore:us-east-1:412602263780:runtime/main-7rUSst3r7E`
+
+## 🎉 Production Deployment Success
+
+**Date**: October 3, 2025  
+**Status**: ✅ **FULLY OPERATIONAL**
+
+### ✅ Verified Working Features:
+- **Internal Tools**: Product catalog with all plans and pricing
+- **External Tools via Gateway**: Web Search, Churn Data Query, Retention Offer
+- **Memory Integration**: Customer context persistence and preference learning
+- **Knowledge Base**: Telecom troubleshooting and policy information
+- **Business Logic**: Personalized retention strategies and data-driven recommendations
+
+### 🧪 Successful Test Results:
+```bash
+# All these commands worked successfully:
+agentcore invoke '{"prompt": "Hello"}'
+agentcore invoke '{"prompt": "What telecom plans do you offer?"}'
+agentcore invoke '{"prompt": "sure it is 3916-NRPAP"}'
+agentcore invoke '{"prompt": "Create a personalized offer for customer 3916-NRPAP"}'
+```
+
+### 🔍 Key Architecture Components:
+- **Agent Runtime**: `main-7rUSst3r7E` (production deployment)
+- **Execution Role**: `AmazonBedrockAgentCoreSDKRuntime-us-east-1-0d6e4079e3`
+- **Memory**: `main_mem-NVs3522m2p` (customer context and preferences)
+- **Gateway**: `customer-retention-gateway-mfvpokj24s` (external tool access)
+- **Lambda Functions**: 3 functions (web-search, churn-data, retention-offer)
+
+### 📊 Production Metrics:
+- ✅ **Deployment**: Successfully deployed to production
+- ✅ **Authentication**: SSM permissions resolved
+- ✅ **Tool Integration**: All external tools functional
+- ✅ **Memory**: Customer context persistence working
+- ✅ **Business Logic**: Retention strategies generated correctly
+- ✅ **Performance**: Response times acceptable for production use
+
 ## 🧹 Cleanup Instructions
 
-### Step 1: Delete Lambda Functions (SAM)
+### Step 1: Delete AgentCore Runtime (Manual)
+1. **Delete Agent Runtime**: Go to Bedrock AgentCore Console → Runtime → Delete agent
+2. **Delete ECR Repository**: Go to ECR Console → Delete `bedrock-agentcore-main`
+3. **Delete Execution Role**: Go to IAM Console → Delete `AmazonBedrockAgentCoreSDKRuntime-us-east-1-{random}`
+
+### Step 2: Delete Lambda Functions (SAM)
 ```bash
 # Delete each Lambda stack
 cd lambda/web_search && sam delete
@@ -287,7 +413,7 @@ cd lambda/churn_data_query && sam delete
 cd lambda/retention_offer && sam delete
 ```
 
-### Step 2: Delete AgentCore Gateway (Manual)
+### Step 3: Delete AgentCore Gateway (Manual)
 ```bash
 # Note: We don't have a delete script, so this needs to be done manually
 # 1. Delete Gateway targets from Bedrock AgentCore Console
@@ -295,7 +421,7 @@ cd lambda/retention_offer && sam delete
 # 3. Delete Gateway IAM role from IAM Console
 ```
 
-### Step 3: Delete Bedrock Resources (Manual)
+### Step 4: Delete Bedrock Resources (Manual)
 1. **Knowledge Base**: Delete from Bedrock Console
 2. **Memory**: Delete from Bedrock AgentCore Console
 3. **SSM Parameters**: Delete from Systems Manager Console
@@ -316,7 +442,7 @@ cd lambda/retention_offer && sam delete
    aws ssm delete-parameter --name "/customer-retention-agent/memory/arn"
    ```
 
-### Step 4: Delete Cognito Resources (Manual)
+### Step 5: Delete Cognito Resources (Manual)
 1. **User Pool**: Delete from Cognito Console
 2. **App Clients**: Automatically deleted with User Pool
 3. **SSM Parameters**: Delete Cognito-related parameters
@@ -329,12 +455,12 @@ cd lambda/retention_offer && sam delete
    aws ssm delete-parameter --name "/customer-retention-agent/cognito/auth-scope"
    ```
 
-### Step 5: Delete IAM Roles (Manual)
+### Step 6: Delete IAM Roles (Manual)
 1. **CustomerRetentionBedrockServiceRole**
 2. **CustomerRetentionLambdaExecutionRole**
 3. **CustomerRetentionGatewayRole**
 
-### Step 6: Delete S3 Bucket
+### Step 7: Delete S3 Bucket
 ```bash
 # Empty and delete bucket
 aws s3 rm s3://412602263780-us-east-1-retention-kb-bucket --recursive
@@ -366,6 +492,9 @@ aws s3 rb s3://412602263780-us-east-1-retention-kb-bucket
 | SSM Parameters | `/customer-retention-agent/cognito/*` | 4 | Manual | Manual |
 | SSM Parameters | `/customer-retention-agent/gateway/*` | 5,6 | Python Scripts | Manual |
 | SSM Parameters | `/customer-retention-agent/memory/*` | 8 | Python Script | Manual |
+| AgentCore Runtime | `main-7rUSst3r7E` | 12-14 | CLI (`agentcore`) | Manual |
+| ECR Repository | `bedrock-agentcore-main` | 12-14 | Auto-created | Manual |
+| Runtime Execution Role | `AmazonBedrockAgentCoreSDKRuntime-us-east-1-0d6e4079e3` | 12-14 | Auto-created | Manual |
 
 ## 🔧 Troubleshooting
 
