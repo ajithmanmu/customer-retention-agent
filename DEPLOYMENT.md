@@ -44,6 +44,22 @@ This guide provides step-by-step instructions for deploying the Customer Retenti
        --type "String"
      ```
 
+3. **Upload Knowledge Base Documents:**
+   ```bash
+   # Upload telecom troubleshooting and policy documents
+   aws s3 cp telecom-troubleshooting-guide.pdf s3://412602263780-us-east-1-retention-kb-bucket/
+   aws s3 cp telecom-policies-procedures.pdf s3://412602263780-us-east-1-retention-kb-bucket/
+   
+   # Verify upload
+   aws s3 ls s3://412602263780-us-east-1-retention-kb-bucket/
+   ```
+
+4. **Sync Knowledge Base:**
+   - Go to Amazon Bedrock Console → Knowledge Base → `knowledge_base_data`
+   - Click "Sync" to process new documents
+   - Wait for "Sync completed" status (5-15 minutes)
+   - Verify documents are indexed and searchable
+
 ### Step 2: Deploy Lambda Functions (SAM)
 
 **Script Locations**: 
@@ -254,6 +270,13 @@ python main.py
 - "I'm a family of 4 and we need unlimited data" (memory learning)
 - "What would you recommend for me?" (memory retrieval)
 
+**Knowledge Base Test Commands**:
+- "What is the exact late fee amount for past due accounts?" (should return "$5.00")
+- "What are the steps for troubleshooting network connectivity issues?" (should provide 4-step process)
+- "What is the restocking fee for returned devices?" (should return "$35")
+- "What are our SLA response time requirements?" (should mention 30 seconds for phone calls)
+- "What is the process for billing disputes?" (should provide detailed procedure)
+
 ## 🧹 Cleanup Instructions
 
 ### Step 1: Delete Lambda Functions (SAM)
@@ -323,6 +346,7 @@ aws s3 rb s3://412602263780-us-east-1-retention-kb-bucket
 | Resource Type | Name | Step | Management Method | Cleanup Method |
 |---------------|------|------|-------------------|----------------|
 | S3 Bucket | `412602263780-us-east-1-retention-kb-bucket` | 1 | Manual | Manual |
+| Knowledge Base Documents | `telecom-troubleshooting-guide.pdf`, `telecom-policies-procedures.pdf` | 1 | Manual | Manual |
 | IAM Role | `CustomerRetentionBedrockServiceRole` | 3 | Manual | Manual |
 | IAM Role | `CustomerRetentionLambdaExecutionRole` | 3 | Manual | Manual |
 | Knowledge Base | `knowledge_base_data` | 1 | Manual | Manual |
