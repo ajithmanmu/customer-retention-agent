@@ -7,7 +7,7 @@ agents:
     container_runtime: docker
     aws:
       execution_role: arn:aws:iam::412602263780:role/AmazonBedrockAgentCoreSDKRuntime-us-east-1-0d6e4079e3
-      execution_role_auto_create: false
+      execution_role_auto_create: true
       account: '412602263780'
       region: us-east-1
       ecr_repository: 412602263780.dkr.ecr.us-east-1.amazonaws.com/bedrock-agentcore-main
@@ -21,18 +21,22 @@ agents:
     bedrock_agentcore:
       agent_id: main-7rUSst3r7E
       agent_arn: arn:aws:bedrock-agentcore:us-east-1:412602263780:runtime/main-7rUSst3r7E
-      agent_session_id: f56a1f23-75f2-4b18-8809-03980447823a
+      agent_session_id: null
     codebuild:
       project_name: bedrock-agentcore-main-builder
       execution_role: arn:aws:iam::412602263780:role/AmazonBedrockAgentCoreSDKCodeBuild-us-east-1-0d6e4079e3
       source_bucket: bedrock-agentcore-codebuild-sources-412602263780-us-east-1
     memory:
       mode: STM_AND_LTM
-      memory_id: main_mem-NVs3522m2p
-      memory_arn: arn:aws:bedrock-agentcore:us-east-1:412602263780:memory/main_mem-NVs3522m2p
-      memory_name: main_mem
+      memory_id: customer_retention_agent_mem-k9B9gpDpBy
+      memory_arn: null
+      memory_name: main_memory
       event_expiry_days: 30
-      first_invoke_memory_check_done: true
-    authorizer_configuration: null
+      first_invoke_memory_check_done: false
+    authorizer_configuration:
+      customJWTAuthorizer:
+        discoveryUrl: https://cognito-idp.us-east-1.amazonaws.com/us-east-1_U4maVaYc5/.well-known/openid-configuration
+        allowedClients:
+        - 13rgm18m8g39c2dn7ik8gg6in9
     request_header_configuration: null
     oauth_configuration: null

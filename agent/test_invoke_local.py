@@ -20,23 +20,13 @@ def test_invoke_with_user_id():
     try:
         from main import invoke
         
-        # Test cases with different user_id values
+        # Test case with the actual Cognito user ID
         test_cases = [
-            # {
-            #     "name": "Test with 'testuser'",
-            #     "payload": {"prompt": "Hello, I need help with my account"},
-            #     "user_id": "testuser"
-            # },
             {
-                "name": "Test with customer ID",
-                "payload": {"prompt": "My customer ID is 3916-NRPAP, I need discount codes"},
-                "user_id": "3916-NRPAP"
-            },
-            # {
-            #     "name": "Test with no user_id",
-            #     "payload": {"prompt": "Hello, I'm a new customer"},
-            #     "user_id": None
-            # }
+                "name": "Test with Cognito user ID",
+                "payload": {"prompt": "I need discount codes for my account"},
+                "user_id": "d4e884b8-70a1-7024-9457-deb37a8c77cb"  # Your actual Cognito user ID
+            }
         ]
         
         for i, test_case in enumerate(test_cases, 1):

@@ -29,6 +29,36 @@ logger = logging.getLogger(__name__)
 REGION = os.environ.get('AWS_DEFAULT_REGION', 'us-east-1')
 ACCOUNT_ID = boto3.client('sts').get_caller_identity()['Account']
 
+# User ID to Customer ID mapping
+# This maps Cognito user IDs to actual customer IDs in your database
+USER_CUSTOMER_MAPPING = {
+    "d4e884b8-70a1-7024-9457-deb37a8c77cb": "3916-NRPAP",  
+    # Add more mappings as needed
+}
+
+def get_customer_id_from_user_id(user_id):
+    """
+    Map Cognito user ID to actual customer ID.
+    
+    Args:
+        user_id (str): The authenticated user ID from Cognito
+        
+    Returns:
+        str: The actual customer ID to use for database queries
+    """
+    if not user_id:
+        return None
+    
+    # Check if we have a mapping for this user
+    customer_id = USER_CUSTOMER_MAPPING.get(user_id)
+    if customer_id:
+        logger.info(f"Mapped user '{user_id}' to customer '{customer_id}'")
+        return customer_id
+    
+    # If no mapping found, use the user_id as customer_id (fallback)
+    logger.info(f"No mapping found for user '{user_id}', using as customer_id")
+    return user_id
+
 # SSM Client for retrieving configuration
 SSM_CLIENT = boto3.client('ssm', region_name=REGION)
 
@@ -221,11 +251,14 @@ def create_agent(customer_id=None):
         
         # Initialize Memory Hooks
         memory_id = get_ssm_parameter("/customer-retention-agent/memory/id")
-        session_id = str(uuid.uuid4())
         
         # Use provided customer_id or fall back to session-based ID
         if not customer_id:
+            session_id = str(uuid.uuid4())
             customer_id = f"session-{session_id[:8]}"
+        else:
+            # Use customer_id as session_id for consistent memory across conversations
+            session_id = customer_id
             
         memory_hooks = CustomerRetentionMemoryHooks(memory_id, customer_id, session_id, REGION)
         
@@ -272,11 +305,14 @@ def invoke(payload, user_id=None):
         return "Error: No prompt provided in the request payload."
     
     try:
-        # Create the agent for this request with the authenticated user_id
-        agent, mcp_client = create_agent(customer_id=user_id)
+        # Map the authenticated user_id to the actual customer_id
+        customer_id = get_customer_id_from_user_id(user_id)
+        
+        # Create the agent for this request with the mapped customer_id
+        agent, mcp_client = create_agent(customer_id=customer_id)
         
         # Log the customer ID being used
-        logger.info(f"Processing request for customer: {user_id or 'anonymous'}")
+        logger.info(f"Processing request for user: {user_id or 'anonymous'} -> customer: {customer_id or 'anonymous'}")
         
         # Invoke the agent with the user input
         response = agent(user_input)
