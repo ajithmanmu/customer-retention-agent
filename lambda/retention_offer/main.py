@@ -198,17 +198,30 @@ def lambda_handler(event, context):
     """
     
     try:
+        # Log the entire incoming event for debugging
+        logger.info(f"=== RETENTION OFFER LAMBDA DEBUG ===")
+        logger.info(f"Full event received: {json.dumps(event, indent=2)}")
+        logger.info(f"Event type: {type(event)}")
+        logger.info(f"Event keys: {list(event.keys()) if isinstance(event, dict) else 'Not a dict'}")
+        
         # Handle API Gateway event
         if 'body' in event:
             # API Gateway event - parse JSON body
+            logger.info("Processing API Gateway event with body")
             body = json.loads(event['body']) if isinstance(event['body'], str) else event['body']
+            logger.info(f"Parsed body: {json.dumps(body, indent=2)}")
             customer_id = body.get('customer_id', '')
             churn_data = body.get('churn_data', {})
         else:
             # Direct invocation event
+            logger.info("Processing direct invocation event")
             customer_id = event.get('customer_id', '')
             churn_data = event.get('churn_data', {})
+            logger.info(f"Direct event customer_id: {customer_id}")
+            logger.info(f"Direct event churn_data: {json.dumps(churn_data, indent=2)}")
         
+        logger.info(f"Extracted customer_id: '{customer_id}'")
+        logger.info(f"Extracted churn_data: {json.dumps(churn_data, indent=2)}")
         logger.info(f"Processing retention offer request for customer: {customer_id}")
         
         # Validate input
@@ -230,7 +243,9 @@ def lambda_handler(event, context):
                 })
             }
         
-        # Generate retention offers
+        logger.info(f"Using provided churn data: {json.dumps(churn_data, indent=2)}")
+        
+        # Generate retention offers using the provided churn data
         retention_offers = generate_retention_offers(customer_id.strip(), churn_data)
         
         response = {
