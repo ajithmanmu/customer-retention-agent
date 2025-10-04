@@ -127,6 +127,7 @@ Create a single Cognito User Pool for authentication:
      - **Client ID**: `<generated-client-id>`
      - **Client Secret**: Generated automatically
      - **Scopes**: `email`, `openid`, `phone`
+     - **⚠️ JWT Authentication**: This client is used for JWT authentication with AgentCore Runtime
 
 3. **Test User Creation**:
    - **Username**: `testuser`
@@ -304,6 +305,13 @@ agentcore launch
 - **Memory**: Short-term + Long-term memory enabled
 - **Platform**: ARM64 (CodeBuild deployment)
 
+**⚠️ IMPORTANT: JWT Authentication Configuration**
+- **Inbound Authentication**: The AgentCore Runtime is configured to use **JWT (JSON Web Tokens)** for inbound authentication
+- **Discovery URL**: `https://cognito-idp.us-east-1.amazonaws.com/us-east-1_U4maVaYc5/.well-known/openid-configuration`
+- **Allowed Clients**: Web Frontend Client ID (`13rgm18m8g39c2dn7ik8gg6in9`)
+- **Authentication Flow**: Frontend users authenticate via Cognito and send JWT tokens to the AgentCore Runtime
+- **Security**: Only users with valid JWT tokens from the configured Cognito User Pool can invoke the agent
+
 ### Step 13: Fix SSM Permissions (CRITICAL)
 
 **Problem**: The auto-created execution role lacks SSM Parameter Store permissions.
@@ -389,6 +397,7 @@ agentcore invoke '{"prompt": "Create a personalized offer for customer 3916-NRPA
 - **Memory**: `main_mem-NVs3522m2p` (customer context and preferences)
 - **Gateway**: `customer-retention-gateway-mfvpokj24s` (external tool access)
 - **Lambda Functions**: 3 functions (web-search, churn-data, retention-offer)
+- **Authentication**: JWT-based authentication via Cognito User Pool
 
 ### 📊 Production Metrics:
 - ✅ **Deployment**: Successfully deployed to production

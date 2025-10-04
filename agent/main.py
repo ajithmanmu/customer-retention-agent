@@ -159,7 +159,11 @@ You are a Customer Retention Agent for a telecom company. Your primary goal is t
 - Product Catalog: Information about available plans, pricing, and features
 - Web Search: Find current information about customer retention strategies
 - Churn Data Query: Analyze customer data and churn risk scores
-- Retention Offer: Generate personalized retention offers and discounts
+- Retention Offer: Generate personalized retention offers and discount codes
+
+**IMPORTANT: When customers ask for discount codes or retention offers, you MUST:**
+**1. First call the churn_data_query tool to get customer data and churn risk**
+**2. Then call the retention_offer tool with customer_id and the complete churn_data from the response**
 
 **Guidelines:**
 1. Always be helpful, empathetic, and solution-oriented
@@ -167,17 +171,24 @@ You are a Customer Retention Agent for a telecom company. Your primary goal is t
 3. Offer relevant solutions based on customer data and behavior
 4. Use data-driven insights to make retention recommendations
 5. Be proactive in identifying at-risk customers
+6. When customers request discount codes, first call churn_data_query, then call retention_offer with customer_id and the complete churn_data response
+7. Remember customer information from the conversation context
+8. Use the customer ID provided in the conversation for all tool calls
 
 **Response Style:**
 - Professional but friendly tone
 - Data-driven recommendations
 - Clear explanations of offers and benefits
 - Proactive suggestions for improving customer experience
+- Always provide actual discount codes when requested
 """
 
-def create_agent():
+def create_agent(customer_id=None):
     """
     Create the Customer Retention Agent with internal tools, Gateway, and Memory.
+    
+    Args:
+        customer_id (str): The customer ID to use for memory context
     """
     try:
         # Initialize the Bedrock model
@@ -211,7 +222,11 @@ def create_agent():
         # Initialize Memory Hooks
         memory_id = get_ssm_parameter("/customer-retention-agent/memory/id")
         session_id = str(uuid.uuid4())
-        customer_id = f"session-{session_id[:8]}"
+        
+        # Use provided customer_id or fall back to session-based ID
+        if not customer_id:
+            customer_id = f"session-{session_id[:8]}"
+            
         memory_hooks = CustomerRetentionMemoryHooks(memory_id, customer_id, session_id, REGION)
         
         # Create agent with all tools and memory hooks
@@ -227,6 +242,7 @@ def create_agent():
         logger.info(f"External tools: {[tool.tool_name for tool in external_tools]}")
         logger.info(f"Total tools: {len(all_tools)}")
         logger.info(f"Memory integration: Active (customer: {customer_id})")
+        logger.info(f"Session ID: {session_id}")
         
         return agent, mcp_client
         
@@ -238,13 +254,14 @@ def create_agent():
 app = BedrockAgentCoreApp()
 
 @app.entrypoint
-def invoke(payload):
+def invoke(payload, user_id=None):
     """
     AgentCore Runtime entrypoint function
     
     Args:
         payload (dict): The request payload containing:
             - prompt (str): The user's input message
+        user_id (str): The authenticated user ID from JWT token
             
     Returns:
         str: The agent's response text
@@ -255,8 +272,11 @@ def invoke(payload):
         return "Error: No prompt provided in the request payload."
     
     try:
-        # Create the agent for this request
-        agent, mcp_client = create_agent()
+        # Create the agent for this request with the authenticated user_id
+        agent, mcp_client = create_agent(customer_id=user_id)
+        
+        # Log the customer ID being used
+        logger.info(f"Processing request for customer: {user_id or 'anonymous'}")
         
         # Invoke the agent with the user input
         response = agent(user_input)

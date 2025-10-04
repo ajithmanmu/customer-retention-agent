@@ -80,16 +80,29 @@ def get_lambda_tool_schemas():
                         "type": "string",
                         "description": "The customer ID to generate offers for"
                     },
-                    "churn_risk": {
-                        "type": "string",
-                        "description": "Customer churn risk level (LOW, MEDIUM, HIGH)"
-                    },
-                    "risk_score": {
-                        "type": "number",
-                        "description": "Numeric churn risk score"
+                    "churn_data": {
+                        "type": "object",
+                        "description": "Complete churn analysis data from churn_data_query",
+                        "properties": {
+                            "churn_analysis": {
+                                "type": "object",
+                                "properties": {
+                                    "risk_level": {"type": "string"},
+                                    "churn_risk_score": {"type": "number"}
+                                }
+                            },
+                            "customer_profile": {
+                                "type": "object",
+                                "properties": {
+                                    "monthly_charges": {"type": "number"},
+                                    "tenure_months": {"type": "number"},
+                                    "contract_type": {"type": "string"}
+                                }
+                            }
+                        }
                     }
                 },
-                "required": ["customer_id", "churn_risk"]
+                "required": ["customer_id", "churn_data"]
             }
         }
     ]
