@@ -1,0 +1,36 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "env": {
+    "NEXT_PUBLIC_AWS_REGION": "@aws-region",
+    "NEXT_PUBLIC_USER_POOL_ID": "@user-pool-id",
+    "NEXT_PUBLIC_USER_POOL_WEB_CLIENT_ID": "@user-pool-web-client-id",
+    "AGENTCORE_RUNTIME_URL": "@agentcore-runtime-url"
+  },
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ]
+}
