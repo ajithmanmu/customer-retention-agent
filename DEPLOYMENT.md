@@ -14,13 +14,8 @@ This guide provides step-by-step instructions for deploying the Customer Retenti
 ### Step 1: Create S3 Bucket and Bedrock Knowledge Base (Manual Process)
 
 1. **Create S3 Bucket for Knowledge Base:**
-   ```bash
-   # Create S3 bucket for knowledge base documents
-   aws s3 mb s3://412602263780-us-east-1-retention-kb-bucket --region us-east-1
-   
-   # Verify bucket creation
-   aws s3 ls s3://412602263780-us-east-1-retention-kb-bucket
-   ```
+   - Create an S3 bucket for knowledge base documents
+   - Note the bucket name for later configuration
 
 2. **Create Bedrock Knowledge Base:**
    - Go to Amazon Bedrock Console
@@ -29,7 +24,7 @@ This guide provides step-by-step instructions for deploying the Customer Retenti
      - **Name**: `knowledge_base_data`
      - **Vector Store**: S3 Vectors (Preview)
      - **Embedding Model**: Amazon Titan Text Embeddings v2
-     - **Data Source**: S3 bucket `412602263780-us-east-1-retention-kb-bucket`
+     - **Data Source**: Your S3 bucket
    - Note the Knowledge Base ID and Data Source ID
    - Store in SSM Parameter Store:
      ```bash
@@ -45,14 +40,8 @@ This guide provides step-by-step instructions for deploying the Customer Retenti
      ```
 
 3. **Upload Knowledge Base Documents:**
-   ```bash
-   # Upload telecom troubleshooting and policy documents
-   aws s3 cp telecom-troubleshooting-guide.pdf s3://412602263780-us-east-1-retention-kb-bucket/
-   aws s3 cp telecom-policies-procedures.pdf s3://412602263780-us-east-1-retention-kb-bucket/
-   
-   # Verify upload
-   aws s3 ls s3://412602263780-us-east-1-retention-kb-bucket/
-   ```
+   - Upload telecom troubleshooting and policy documents to your S3 bucket
+   - Verify the documents are uploaded successfully
 
 4. **Sync Knowledge Base:**
    - Go to Amazon Bedrock Console → Knowledge Base → `knowledge_base_data`
@@ -127,6 +116,7 @@ Create a single Cognito User Pool for authentication:
      - **Client ID**: `<generated-client-id>`
      - **Client Secret**: Generated automatically
      - **Scopes**: `email`, `openid`, `phone`
+     - **⚠️ IMPORTANT**: Enable `USER_PASSWORD_AUTH` flow for this client
      - **⚠️ JWT Authentication**: This client is used for JWT authentication with AgentCore Runtime
 
 3. **Test User Creation**:
@@ -204,31 +194,7 @@ python attach_lambda_targets.py
    - Automatically stores target IDs in SSM parameters
    - Parameters: `/customer-retention-agent/gateway/targets/websearchtarget`, `/customer-retention-agent/gateway/targets/churndataquerytarget`, `/customer-retention-agent/gateway/targets/retentionoffertarget`
 
-### Step 7: Test the Complete Agent (Local)
-
-**Script Location**: `agent/main.py`
-
-**Command**:
-```bash
-cd agent
-python main.py
-```
-
-**What this does**:
-- Creates the complete Customer Retention Agent with all tools integrated
-- Connects to Gateway and loads external tools (Web Search, Churn Data Query, Retention Offer)
-- Provides interactive chat interface for testing
-- Combines internal tools (Product Catalog) with external tools via Gateway
-- **Note**: This step is now combined with Step 9 (Memory Integration)
-
-**Test Commands to Try**:
-- "What tools do you have available?"
-- "Show me your product catalog"
-- "Search for customer retention strategies 2024"
-- "Check churn data for customer 3916-NRPAP"
-- "Generate a retention offer for a high-risk customer"
-
-### Step 8: Create and Attach Memory (Python Script)
+### Step 7: Create and Attach Memory (Python Script)
 
 **Script Location**: `agent/scripts/create_memory.py`
 
@@ -244,9 +210,9 @@ python create_memory.py
 - Stores memory ID and ARN in SSM Parameter Store
 - Parameters: `/customer-retention-agent/memory/id` and `/customer-retention-agent/memory/arn`
 
-### Step 9: Test Agent with Memory (Local)
+### Step 8: Test the Complete Agent (Local)
 
-**Script Location**: `agent/main.py` (now includes memory integration)
+**Script Location**: `agent/main.py`
 
 **Command**:
 ```bash
@@ -256,31 +222,16 @@ python main.py
 
 **What this does**:
 - Creates the complete Customer Retention Agent with memory integration
+- Connects to Gateway and loads external tools (Web Search, Churn Data Query, Retention Offer)
+- Provides interactive chat interface for testing
+- Combines internal tools (Product Catalog) with external tools via Gateway
 - Persists conversation history across sessions
 - Provides customer context awareness
 - Remembers customer preferences and past interactions
-- Combines internal tools (Product Catalog) with external tools via Gateway
-- Automatically retrieves customer context and saves conversations
-
-**Memory Test Commands**:
-- "What tools do you have available?"
-- "I prefer premium plans with international calling"
-- "What did I say I preferred earlier?" (tests memory)
-- "Check churn data for customer 3916-NRPAP"
-- "Generate a retention offer based on my preferences" (uses memory context)
-- "I'm a family of 4 and we need unlimited data" (memory learning)
-- "What would you recommend for me?" (memory retrieval)
-
-**Knowledge Base Test Commands**:
-- "What is the exact late fee amount for past due accounts?" (should return "$5.00")
-- "What are the steps for troubleshooting network connectivity issues?" (should provide 4-step process)
-- "What is the restocking fee for returned devices?" (should return "$35")
-- "What are our SLA response time requirements?" (should mention 30 seconds for phone calls)
-- "What is the process for billing disputes?" (should provide detailed procedure)
 
 ## 🚀 Production Deployment (AgentCore Runtime)
 
-### Step 12: Deploy to AgentCore Runtime
+### Step 9: Deploy to AgentCore Runtime
 
 **Prerequisites:**
 - Complete all previous steps
@@ -307,12 +258,12 @@ agentcore launch
 
 **⚠️ IMPORTANT: JWT Authentication Configuration**
 - **Inbound Authentication**: The AgentCore Runtime is configured to use **JWT (JSON Web Tokens)** for inbound authentication
-- **Discovery URL**: `https://cognito-idp.us-east-1.amazonaws.com/us-east-1_U4maVaYc5/.well-known/openid-configuration`
-- **Allowed Clients**: Web Frontend Client ID (`13rgm18m8g39c2dn7ik8gg6in9`)
+- **Discovery URL**: `https://cognito-idp.us-east-1.amazonaws.com/YOUR_USER_POOL_ID/.well-known/openid-configuration`
+- **Allowed Clients**: Your Web Frontend Client ID
 - **Authentication Flow**: Frontend users authenticate via Cognito and send JWT tokens to the AgentCore Runtime
 - **Security**: Only users with valid JWT tokens from the configured Cognito User Pool can invoke the agent
 
-### Step 13: Fix SSM Permissions (CRITICAL)
+### Step 10: Fix SSM Permissions (CRITICAL)
 
 **Problem**: The auto-created execution role lacks SSM Parameter Store permissions.
 
@@ -330,7 +281,7 @@ agentcore launch
                 "ssm:GetParameters"
             ],
             "Resource": [
-                "arn:aws:ssm:us-east-1:412602263780:parameter/customer-retention-agent/*"
+                "arn:aws:ssm:us-east-1:YOUR_ACCOUNT_ID:parameter/customer-retention-agent/*"
             ]
         }
     ]
@@ -344,7 +295,7 @@ agentcore launch
 4. Name it: `CustomerRetentionSSMPolicy`
 5. Save
 
-### Step 14: Test Production Agent
+### Step 11: Test Production Agent
 
 **Test Commands:**
 ```bash
@@ -355,10 +306,10 @@ agentcore invoke '{"prompt": "Hello"}'
 agentcore invoke '{"prompt": "What telecom plans do you offer?"}'
 
 # Churn analysis test
-agentcore invoke '{"prompt": "Check the churn risk for customer ID 3916-NRPAP"}'
+agentcore invoke '{"prompt": "Check the churn risk for customer ID YOUR_CUSTOMER_ID"}'
 
 # Retention offer test
-agentcore invoke '{"prompt": "Create a personalized offer for customer 3916-NRPAP"}'
+agentcore invoke '{"prompt": "Create a personalized offer for customer YOUR_CUSTOMER_ID"}'
 ```
 
 **Expected Results:**
@@ -368,120 +319,61 @@ agentcore invoke '{"prompt": "Create a personalized offer for customer 3916-NRPA
 - ✅ Retention offers are personalized and data-driven
 - ✅ Memory integration maintains customer context
 
-**Production Agent ARN**: `arn:aws:bedrock-agentcore:us-east-1:412602263780:runtime/main-7rUSst3r7E`
-
-## 🎉 Production Deployment Success
-
-**Date**: October 3, 2025  
-**Status**: ✅ **FULLY OPERATIONAL**
-
-### ✅ Verified Working Features:
-- **Internal Tools**: Product catalog with all plans and pricing
-- **External Tools via Gateway**: Web Search, Churn Data Query, Retention Offer
-- **Memory Integration**: Customer context persistence and preference learning
-- **Knowledge Base**: Telecom troubleshooting and policy information
-- **Business Logic**: Personalized retention strategies and data-driven recommendations
-
-### 🧪 Successful Test Results:
-```bash
-# All these commands worked successfully:
-agentcore invoke '{"prompt": "Hello"}'
-agentcore invoke '{"prompt": "What telecom plans do you offer?"}'
-agentcore invoke '{"prompt": "sure it is 3916-NRPAP"}'
-agentcore invoke '{"prompt": "Create a personalized offer for customer 3916-NRPAP"}'
-```
-
-### 🔍 Key Architecture Components:
-- **Agent Runtime**: `main-7rUSst3r7E` (production deployment)
-- **Execution Role**: `AmazonBedrockAgentCoreSDKRuntime-us-east-1-0d6e4079e3`
-- **Memory**: `main_mem-NVs3522m2p` (customer context and preferences)
-- **Gateway**: `customer-retention-gateway-mfvpokj24s` (external tool access)
-- **Lambda Functions**: 3 functions (web-search, churn-data, retention-offer)
-- **Authentication**: JWT-based authentication via Cognito User Pool
-
-### 📊 Production Metrics:
-- ✅ **Deployment**: Successfully deployed to production
-- ✅ **Authentication**: SSM permissions resolved
-- ✅ **Tool Integration**: All external tools functional
-- ✅ **Memory**: Customer context persistence working
-- ✅ **Business Logic**: Retention strategies generated correctly
-- ✅ **Performance**: Response times acceptable for production use
-
 ## 🧹 Cleanup Instructions
 
-### Step 1: Delete AgentCore Runtime (Manual)
-1. **Delete Agent Runtime**: Go to Bedrock AgentCore Console → Runtime → Delete agent
-2. **Delete ECR Repository**: Go to ECR Console → Delete `bedrock-agentcore-main`
-3. **Delete Execution Role**: Go to IAM Console → Delete `AmazonBedrockAgentCoreSDKRuntime-us-east-1-{random}`
+Delete these resources in the following order:
 
-### Step 2: Delete Lambda Functions (SAM)
-```bash
-# Delete each Lambda stack
-cd lambda/web_search && sam delete
-cd lambda/churn_data_query && sam delete
-cd lambda/retention_offer && sam delete
-```
+### 1. AgentCore Runtime Resources
+- **Agent Runtime**: Delete from Bedrock AgentCore Console → Runtime
+- **ECR Repository**: Delete `bedrock-agentcore-main` from ECR Console
+- **Execution Role**: Delete `AmazonBedrockAgentCoreSDKRuntime-us-east-1-{random}` from IAM Console
 
-### Step 3: Delete AgentCore Gateway (Manual)
-```bash
-# Note: We don't have a delete script, so this needs to be done manually
-# 1. Delete Gateway targets from Bedrock AgentCore Console
-# 2. Delete Gateway from Bedrock AgentCore Console
-# 3. Delete Gateway IAM role from IAM Console
-```
+### 2. Lambda Functions
+- **Web Search Lambda**: Delete using `sam delete` from `lambda/web_search/`
+- **Churn Data Query Lambda**: Delete using `sam delete` from `lambda/churn_data_query/`
+- **Retention Offer Lambda**: Delete using `sam delete` from `lambda/retention_offer/`
 
-### Step 4: Delete Bedrock Resources (Manual)
-1. **Knowledge Base**: Delete from Bedrock Console
-2. **Memory**: Delete from Bedrock AgentCore Console
-3. **SSM Parameters**: Delete from Systems Manager Console
-   ```bash
-   # Delete Bedrock SSM parameters
-   aws ssm delete-parameter --name "/app/retention/agentcore/knowledge_base_id"
-   aws ssm delete-parameter --name "/app/retention/agentcore/data_source_id"
-   
-   # Delete Gateway SSM parameters
-   aws ssm delete-parameter --name "/customer-retention-agent/gateway/id"
-   aws ssm delete-parameter --name "/customer-retention-agent/gateway/url"
-   aws ssm delete-parameter --name "/customer-retention-agent/gateway/targets/websearchtarget"
-   aws ssm delete-parameter --name "/customer-retention-agent/gateway/targets/churndataquerytarget"
-   aws ssm delete-parameter --name "/customer-retention-agent/gateway/targets/retentionoffertarget"
-   
-   # Delete Memory SSM parameters
-   aws ssm delete-parameter --name "/customer-retention-agent/memory/id"
-   aws ssm delete-parameter --name "/customer-retention-agent/memory/arn"
-   ```
+### 3. AgentCore Gateway Resources
+- **Gateway Targets**: Delete from Bedrock AgentCore Console
+- **Gateway**: Delete from Bedrock AgentCore Console
+- **Gateway IAM Role**: Delete `CustomerRetentionGatewayRole` from IAM Console
 
-### Step 5: Delete Cognito Resources (Manual)
-1. **User Pool**: Delete from Cognito Console
-2. **App Clients**: Automatically deleted with User Pool
-3. **SSM Parameters**: Delete Cognito-related parameters
-   ```bash
-   # Delete Cognito SSM parameters
-   aws ssm delete-parameter --name "/customer-retention-agent/cognito/user-pool-id"
-   aws ssm delete-parameter --name "/customer-retention-agent/cognito/m2m-client-id"
-   aws ssm delete-parameter --name "/customer-retention-agent/cognito/m2m-client-secret"
-   aws ssm delete-parameter --name "/customer-retention-agent/cognito/discovery-url"
-   aws ssm delete-parameter --name "/customer-retention-agent/cognito/auth-scope"
-   ```
+### 4. Bedrock Resources
+- **Knowledge Base**: Delete from Bedrock Console
+- **Memory**: Delete from Bedrock AgentCore Console
+- **SSM Parameters**: Delete the following from Systems Manager Console:
+  - `/app/retention/agentcore/knowledge_base_id`
+  - `/app/retention/agentcore/data_source_id`
+  - `/customer-retention-agent/gateway/id`
+  - `/customer-retention-agent/gateway/url`
+  - `/customer-retention-agent/gateway/targets/websearchtarget`
+  - `/customer-retention-agent/gateway/targets/churndataquerytarget`
+  - `/customer-retention-agent/gateway/targets/retentionoffertarget`
+  - `/customer-retention-agent/memory/id`
+  - `/customer-retention-agent/memory/arn`
 
-### Step 6: Delete IAM Roles (Manual)
-1. **CustomerRetentionBedrockServiceRole**
-2. **CustomerRetentionLambdaExecutionRole**
-3. **CustomerRetentionGatewayRole**
+### 5. Cognito Resources
+- **User Pool**: Delete from Cognito Console (app clients are automatically deleted)
+- **SSM Parameters**: Delete the following from Systems Manager Console:
+  - `/customer-retention-agent/cognito/user-pool-id`
+  - `/customer-retention-agent/cognito/m2m-client-id`
+  - `/customer-retention-agent/cognito/m2m-client-secret`
+  - `/customer-retention-agent/cognito/discovery-url`
+  - `/customer-retention-agent/cognito/auth-scope`
 
-### Step 7: Delete S3 Bucket
-```bash
-# Empty and delete bucket
-aws s3 rm s3://412602263780-us-east-1-retention-kb-bucket --recursive
-aws s3 rb s3://412602263780-us-east-1-retention-kb-bucket
-```
+### 6. IAM Roles
+- **CustomerRetentionBedrockServiceRole**
+- **CustomerRetentionLambdaExecutionRole**
+
+### 7. S3 Bucket
+- **Knowledge Base Bucket**: Empty and delete your S3 bucket
 
 ## 📊 Resource Summary
 
 | Resource Type | Name | Step | Management Method | Cleanup Method |
 |---------------|------|------|-------------------|----------------|
-| S3 Bucket | `412602263780-us-east-1-retention-kb-bucket` | 1 | Manual | Manual |
-| Knowledge Base Documents | `telecom-troubleshooting-guide.pdf`, `telecom-policies-procedures.pdf` | 1 | Manual | Manual |
+| S3 Bucket | Your knowledge base bucket | 1 | Manual | Manual |
+| Knowledge Base Documents | Telecom troubleshooting and policy documents | 1 | Manual | Manual |
 | IAM Role | `CustomerRetentionBedrockServiceRole` | 3 | Manual | Manual |
 | IAM Role | `CustomerRetentionLambdaExecutionRole` | 3 | Manual | Manual |
 | Knowledge Base | `knowledge_base_data` | 1 | Manual | Manual |
@@ -494,16 +386,16 @@ aws s3 rb s3://412602263780-us-east-1-retention-kb-bucket
 | AgentCore Gateway | `customer-retention-gateway` | 5 | Python Script (`agent/scripts/create_gateway.py`) | Manual |
 | Gateway IAM Role | `CustomerRetentionGatewayRole` | 5 | Python Script (`agent/scripts/create_gateway.py`) | Manual |
 | Gateway Targets | `WebSearchTarget`, `ChurnDataQueryTarget`, `RetentionOfferTarget` | 6 | Python Script (`agent/scripts/attach_lambda_targets.py`) | Manual |
-| Agent | Complete Customer Retention Agent with Memory | 7,9 | Python Script (`agent/main.py`) | N/A (Local) |
-| Memory | `customer-retention-memory` | 8 | Python Script (`agent/scripts/create_memory.py`) | Manual |
-| Memory Hooks | Memory Integration Logic | 9 | Integrated in `agent/memory_hooks.py` | N/A (Local) |
+| Memory | `customer-retention-memory` | 7 | Python Script (`agent/scripts/create_memory.py`) | Manual |
+| Agent | Complete Customer Retention Agent with Memory | 8 | Python Script (`agent/main.py`) | N/A (Local) |
+| Memory Hooks | Memory Integration Logic | 8 | Integrated in `agent/memory_hooks.py` | N/A (Local) |
 | SSM Parameters | `/app/retention/agentcore/*` | 1 | Manual | Manual |
 | SSM Parameters | `/customer-retention-agent/cognito/*` | 4 | Manual | Manual |
 | SSM Parameters | `/customer-retention-agent/gateway/*` | 5,6 | Python Scripts | Manual |
-| SSM Parameters | `/customer-retention-agent/memory/*` | 8 | Python Script | Manual |
-| AgentCore Runtime | `main-7rUSst3r7E` | 12-14 | CLI (`agentcore`) | Manual |
-| ECR Repository | `bedrock-agentcore-main` | 12-14 | Auto-created | Manual |
-| Runtime Execution Role | `AmazonBedrockAgentCoreSDKRuntime-us-east-1-0d6e4079e3` | 12-14 | Auto-created | Manual |
+| SSM Parameters | `/customer-retention-agent/memory/*` | 7 | Python Script | Manual |
+| AgentCore Runtime | Your runtime name | 9-11 | CLI (`agentcore`) | Manual |
+| ECR Repository | `bedrock-agentcore-main` | 9-11 | Auto-created | Manual |
+| Runtime Execution Role | `AmazonBedrockAgentCoreSDKRuntime-us-east-1-{random}` | 9-11 | Auto-created | Manual |
 
 ## 🔧 Troubleshooting
 
@@ -512,20 +404,6 @@ aws s3 rb s3://412602263780-us-east-1-retention-kb-bucket
 2. **Knowledge Base creation fails**: Verify S3 bucket permissions
 3. **Memory creation fails**: Check AgentCore access
 4. **SSM parameter access fails**: Verify parameter names and permissions
-
-### Useful Commands:
-```bash
-# Check CloudFormation stacks
-aws cloudformation list-stacks --query 'StackSummaries[?contains(StackName, `customer-retention`)].StackName'
-
-# Check Lambda functions
-aws lambda list-functions --query 'Functions[?contains(FunctionName, `customer-retention`)].FunctionName'
-
-# Check SSM parameters
-aws ssm get-parameters-by-path --path "/app/retention/agentcore"
-aws ssm get-parameters-by-path --path "/customer-retention-agent/cognito"
-aws ssm get-parameters-by-path --path "/customer-retention-agent/gateway"
-
-# Check AgentCore Gateway
-aws bedrock-agentcore-control list-gateways --query 'gateways[?contains(name, `customer-retention`)].{Name:name,ID:gatewayId,Status:status}'
-```
+5. **AgentCore Runtime deployment fails**: Check execution role permissions
+6. **JWT authentication fails**: Verify Cognito User Pool configuration and USER_PASSWORD_AUTH flow
+7. **Gateway connection fails**: Check Gateway IAM role and Lambda function permissions
