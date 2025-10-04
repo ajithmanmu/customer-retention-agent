@@ -29,8 +29,7 @@ export async function POST(request: NextRequest) {
     // Debug: Log the session ID length
     console.log(`Generated runtimeSessionId: ${runtimeSessionId} (length: ${runtimeSessionId.length})`)
 
-    // Call AgentCore Runtime directly with JWT token (like the tutorial)
-    const agentRuntimeArn = 'arn:aws:bedrock-agentcore:us-east-1:412602263780:runtime/main-7rUSst3r7E'
+    const agentRuntimeArn = process.env.AGENTCORE_RUNTIME_ARN || 'arn:aws:bedrock-agentcore:us-east-1:YOUR_ACCOUNT_ID:runtime/main-7rUSst3r7E'
     const escapedArn = encodeURIComponent(agentRuntimeArn)
     const endpointUrl = `https://bedrock-agentcore.us-east-1.amazonaws.com/runtimes/${escapedArn}/invocations`
 

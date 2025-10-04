@@ -12,6 +12,7 @@ import boto3
 import json
 import requests
 import uuid
+import base64
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools import tool
@@ -36,6 +37,34 @@ USER_CUSTOMER_MAPPING = {
     # Add more mappings as needed
 }
 
+def decode_jwt_token(token):
+    """Decode JWT token to extract user ID"""
+    try:
+        if not token:
+            return None
+        
+        # Split the token
+        parts = token.split('.')
+        if len(parts) != 3:
+            logger.warning(f"Invalid JWT format: expected 3 parts, got {len(parts)}")
+            return None
+        
+        # Decode the payload (middle part)
+        payload = parts[1]
+        # Add padding if needed
+        payload += '=' * (4 - len(payload) % 4)
+        decoded = base64.b64decode(payload)
+        payload_data = json.loads(decoded)
+        
+        # Extract user ID from 'sub' field
+        user_id = payload_data.get('sub')
+        logger.info(f"Extracted user_id from JWT: {user_id}")
+        return user_id
+        
+    except Exception as e:
+        logger.error(f"Error decoding JWT token: {e}")
+        return None
+
 def get_customer_id_from_user_id(user_id):
     """
     Map Cognito user ID to actual customer ID.
@@ -47,16 +76,17 @@ def get_customer_id_from_user_id(user_id):
         str: The actual customer ID to use for database queries
     """
     if not user_id:
+        logger.warning("user_id is None or empty")
         return None
     
     # Check if we have a mapping for this user
     customer_id = USER_CUSTOMER_MAPPING.get(user_id)
     if customer_id:
-        logger.info(f"Mapped user '{user_id}' to customer '{customer_id}'")
+        logger.info(f"User mapping: {user_id} -> {customer_id}")
         return customer_id
     
     # If no mapping found, use the user_id as customer_id (fallback)
-    logger.info(f"No mapping found for user '{user_id}', using as customer_id")
+    logger.warning(f"No mapping found for user_id: {user_id}, using as customer_id")
     return user_id
 
 # SSM Client for retrieving configuration
@@ -287,26 +317,50 @@ def create_agent(customer_id=None):
 app = BedrockAgentCoreApp()
 
 @app.entrypoint
-def invoke(payload, user_id=None):
+def invoke(payload, user_id=None, context=None):
     """
     AgentCore Runtime entrypoint function
     
     Args:
         payload (dict): The request payload containing:
             - prompt (str): The user's input message
-        user_id (str): The authenticated user ID from JWT token
+        user_id (str): The authenticated user ID from JWT token (may be None in local mode)
+        context (dict): Request context containing headers and other info
             
     Returns:
         str: The agent's response text
     """
+    # If user_id is None (local mode), try to extract from JWT token in context
+    if user_id is None and context:
+        # Try to get Authorization header from context
+        headers = context.get('headers', {})
+        auth_header = headers.get('Authorization') or headers.get('authorization')
+        
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header[7:]  # Remove 'Bearer ' prefix
+            extracted_user_id = decode_jwt_token(token)
+            if extracted_user_id:
+                user_id = extracted_user_id
+                logger.info(f"Extracted user_id from JWT token: {user_id}")
+            else:
+                logger.warning("Failed to extract user_id from JWT token")
+        else:
+            logger.warning("No Authorization header found in context")
+    
+    
     user_input = payload.get("prompt", "")
     
     if not user_input:
         return "Error: No prompt provided in the request payload."
     
     try:
-        # Map the authenticated user_id to the actual customer_id
-        customer_id = get_customer_id_from_user_id(user_id)
+        # Check if customerId is provided in payload (from frontend)
+        payload_customer_id = payload.get("customerId")
+        if payload_customer_id:
+            customer_id = payload_customer_id
+        else:
+            # Map the authenticated user_id to the actual customer_id
+            customer_id = get_customer_id_from_user_id(user_id)
         
         # Create the agent for this request with the mapped customer_id
         agent, mcp_client = create_agent(customer_id=customer_id)
